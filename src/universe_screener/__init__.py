@@ -30,7 +30,7 @@ Example:
 
 import logging
 
-__version__ = "0.2.0"  # Phase 1 with resilience
+__version__ = "0.3.0"  # Phase 2 with observability
 
 
 def configure_logging(

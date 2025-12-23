@@ -2,7 +2,7 @@
 Screening Pipeline - Main Orchestrator.
 
 The ScreeningPipeline coordinates the entire screening workflow.
-Includes resilience and validation layers (Phase 1).
+Includes resilience (Phase 1) and observability (Phase 2) layers.
 """
 
 from __future__ import annotations
@@ -145,6 +145,41 @@ class DataValidatorProtocol(Protocol):
         ...
 
 
+class HealthMonitorProtocol(Protocol):
+    """Protocol for health monitors (Phase 2)."""
+
+    def check_pre_screening(self) -> Any:
+        ...
+
+    def check_post_load(self, context: DataContext) -> Any:
+        ...
+
+    def check_post_filtering(self, result: ScreeningResult) -> Any:
+        ...
+
+
+class SnapshotManagerProtocol(Protocol):
+    """Protocol for snapshot managers (Phase 2)."""
+
+    def create_snapshot(
+        self, screening_date: datetime, asset_class: AssetClass, metadata: Optional[Dict] = None
+    ) -> str:
+        ...
+
+    def get_current_snapshot_id(self) -> Optional[str]:
+        ...
+
+
+class VersionManagerProtocol(Protocol):
+    """Protocol for version managers (Phase 2)."""
+
+    def get_version_metadata(self, config: Optional[Any] = None) -> Any:
+        ...
+
+    def register_filters(self, filters: List[Any]) -> None:
+        ...
+
+
 class ScreeningPipeline:
     """Main orchestrator for the screening workflow."""
 
@@ -158,6 +193,9 @@ class ScreeningPipeline:
         error_handler: Optional[ErrorHandlerProtocol] = None,
         request_validator: Optional[RequestValidatorProtocol] = None,
         data_validator: Optional[DataValidatorProtocol] = None,
+        health_monitor: Optional[HealthMonitorProtocol] = None,
+        snapshot_manager: Optional[SnapshotManagerProtocol] = None,
+        version_manager: Optional[VersionManagerProtocol] = None,
     ) -> None:
         """
         Initialize pipeline with all dependencies.
@@ -171,6 +209,9 @@ class ScreeningPipeline:
             error_handler: For retry/circuit breaker (optional, Phase 1)
             request_validator: For request validation (optional, Phase 1)
             data_validator: For data validation (optional, Phase 1)
+            health_monitor: For health checks (optional, Phase 2)
+            snapshot_manager: For point-in-time consistency (optional, Phase 2)
+            version_manager: For version tracking (optional, Phase 2)
         """
         self.provider = provider
         self.filters = filters
@@ -180,6 +221,13 @@ class ScreeningPipeline:
         self.error_handler = error_handler
         self.request_validator = request_validator
         self.data_validator = data_validator
+        self.health_monitor = health_monitor
+        self.snapshot_manager = snapshot_manager
+        self.version_manager = version_manager
+
+        # Register filter versions if version manager available
+        if self.version_manager:
+            self.version_manager.register_filters(filters)
 
     def screen(
         self,
@@ -207,6 +255,24 @@ class ScreeningPipeline:
         correlation_id = str(uuid.uuid4())
         self.audit_logger.set_correlation_id(correlation_id)
 
+        # Phase 2: Pre-screening health check
+        if self.health_monitor:
+            pre_health = self.health_monitor.check_pre_screening()
+            if not pre_health.is_healthy:
+                logger.warning(f"Pre-screening health check failed: {pre_health.summary}")
+
+        # Phase 2: Create snapshot for point-in-time consistency
+        # NOTE: Currently for audit trail only. For full point-in-time consistency,
+        # the provider would need to receive snapshot_id and query a versioned data store.
+        # TODO (STABILIZATION): Extend UniverseProviderProtocol with snapshot_id parameter
+        snapshot_id: Optional[str] = None
+        if self.snapshot_manager:
+            snapshot_id = self.snapshot_manager.create_snapshot(
+                screening_date=date,
+                asset_class=asset_class,
+                metadata={"correlation_id": correlation_id},
+            )
+
         # 1. Create request
         request = ScreeningRequest(
             date=date,
@@ -222,6 +288,12 @@ class ScreeningPipeline:
 
         # 3. Load data (with optional error handling)
         context = self._load_data(request)
+
+        # Phase 2: Post-load health check
+        if self.health_monitor:
+            post_load_health = self.health_monitor.check_post_load(context)
+            if not post_load_health.is_healthy:
+                logger.warning(f"Post-load health check failed: {post_load_health.summary}")
 
         # 4. Validate data (Phase 1)
         if self.data_validator:
@@ -255,14 +327,22 @@ class ScreeningPipeline:
         )
 
         # 7. Build result
-        return ScreeningResult(
+        result = ScreeningResult(
             request=request,
             input_universe=context.assets,
             output_universe=current_assets,
             audit_trail=audit_trail,
             metrics=self.metrics_collector.get_metrics(),
-            metadata=self._build_metadata(correlation_id, total_duration),
+            metadata=self._build_metadata(correlation_id, total_duration, snapshot_id),
         )
+
+        # Phase 2: Post-filtering health check
+        if self.health_monitor:
+            post_filter_health = self.health_monitor.check_post_filtering(result)
+            if not post_filter_health.is_healthy:
+                logger.warning(f"Post-filtering health check failed: {post_filter_health.summary}")
+
+        return result
 
     def _load_data(self, request: ScreeningRequest) -> DataContext:
         """Bulk load data into DataContext."""
@@ -370,11 +450,30 @@ class ScreeningPipeline:
 
         return stage_result, passed_assets
 
-    def _build_metadata(self, correlation_id: str, duration: float) -> dict:
+    def _build_metadata(
+        self,
+        correlation_id: str,
+        duration: float,
+        snapshot_id: Optional[str] = None,
+    ) -> dict:
         """Build result metadata."""
-        return {
+        metadata = {
             "correlation_id": correlation_id,
             "timestamp": datetime.now().isoformat(),
             "duration_seconds": duration,
-            "version": "0.2.0",  # Phase 1 with resilience
+            "version": "0.3.0",  # Phase 2 with observability
         }
+
+        # Add snapshot ID if available
+        if snapshot_id:
+            metadata["snapshot_id"] = snapshot_id
+
+        # Add version metadata if version manager available
+        if self.version_manager:
+            version_meta = self.version_manager.get_version_metadata(self.config)
+            metadata["code_version"] = version_meta.code_version
+            metadata["config_hash"] = version_meta.config_hash
+            if version_meta.git_sha:
+                metadata["git_sha"] = version_meta.git_sha
+
+        return metadata
