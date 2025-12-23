@@ -1,0 +1,45 @@
+# Sample Configuration for Testing
+# This configuration is used by integration tests
+
+version: "1.0"
+
+global:
+  default_lookback_days: 60
+  timezone: "UTC"
+  batch_size_mb: 500
+
+structural_filter:
+  enabled: true
+  allowed_asset_types:
+    - COMMON_STOCK
+  allowed_exchanges:
+    - NYSE
+    - NASDAQ
+    - XETRA
+  min_listing_age_days: 252
+
+liquidity_filter:
+  enabled: true
+  stock:
+    min_avg_dollar_volume_usd: 5000000
+    min_trading_days_pct: 0.95
+    lookback_days: 60
+  crypto:
+    max_slippage_pct: 0.5
+    min_order_book_depth_usd: 100000
+  forex:
+    max_spread_pips: 3.0
+
+data_quality_filter:
+  enabled: true
+  max_missing_days: 3
+  min_news_articles: null
+  lookback_days: 60
+
+health_monitoring:
+  enabled: false
+  max_ram_usage_pct: 80.0
+  max_context_size_mb: 500
+  min_output_universe_size: 5
+  max_reduction_ratio: 0.99
+

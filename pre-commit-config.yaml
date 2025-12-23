@@ -1,0 +1,63 @@
+# Pre-commit hooks configuration
+# These hooks are ONLY ENFORCED when maturity = "PRODUCTION" in pyproject.toml
+# 
+# To enable: pre-commit install
+# To disable: pre-commit uninstall
+# To bypass once: git commit --no-verify
+
+repos:
+  - repo: local
+    hooks:
+      # ========================================================================
+      # MATURITY CHECK - Always runs
+      # ========================================================================
+      - id: check-maturity-level
+        name: Check Project Maturity Level
+        entry: python scripts/check_maturity.py
+        language: python
+        pass_filenames: false
+        always_run: true
+        stages: [commit]
+      
+      # ========================================================================
+      # TEST ASPECT COVERAGE - Only for PRODUCTION
+      # ========================================================================
+      - id: test-aspect-coverage
+        name: Check Test Aspect Coverage Documentation
+        entry: python scripts/check_test_aspects.py
+        language: python
+        pass_filenames: false
+        always_run: true
+        stages: [commit]
+        # Note: Script checks maturity internally and skips if not PRODUCTION
+        
+      # ========================================================================
+      # UNIT TESTS - Only for STABILIZATION and PRODUCTION
+      # ========================================================================
+      - id: pytest-check
+        name: Run Unit Tests
+        entry: bash -c 'if grep -q "maturity.*=.*[\"'\'']PRODUCTION[\"'\'']" pyproject.toml || grep -q "maturity.*=.*[\"'\'']STABILIZATION[\"'\'']" pyproject.toml; then pytest tests/ -v -m "not slow"; else echo "Skipping tests (maturity < STABILIZATION)"; fi'
+        language: system
+        pass_filenames: false
+        stages: [commit]
+        
+      # ========================================================================
+      # COVERAGE CHECK - Only for PRODUCTION
+      # ========================================================================
+      - id: coverage-check
+        name: Check Test Coverage (80%+)
+        entry: bash -c 'if grep -q "maturity.*=.*[\"'\'']PRODUCTION[\"'\'']" pyproject.toml; then pytest --cov=src --cov-report=term-missing --cov-fail-under=80; else echo "Skipping coverage check (maturity < PRODUCTION)"; fi'
+        language: system
+        pass_filenames: false
+        stages: [push]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: detect-private-key
+        exclude: ^tests/fixtures/

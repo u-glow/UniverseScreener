@@ -1,0 +1,38 @@
+# Universe Screener - Aggressive Profile
+# ======================================
+#
+# Relaxed filtering criteria for broader coverage.
+# Results in larger universe with more opportunities.
+#
+# Use case: Research, backtesting, finding edge cases
+
+# Relaxed structural requirements
+structural_filter:
+  # Allow younger listings
+  min_listing_age_days: 126  # ~6 months
+
+# Lower liquidity thresholds
+liquidity_filter:
+  stock:
+    # Lower minimum dollar volume
+    min_avg_dollar_volume_usd: 1000000
+
+    # Accept more missing days
+    min_trading_days_pct: 0.85
+
+  crypto:
+    # Accept higher slippage
+    max_slippage_pct: 1.0
+
+  forex:
+    # Accept wider spreads
+    max_spread_pips: 5.0
+
+# Relaxed data quality
+data_quality_filter:
+  # Allow more missing days
+  max_missing_days: 5
+
+  # Don't require news coverage
+  min_news_articles: null
+

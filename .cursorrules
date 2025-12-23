@@ -1,0 +1,486 @@
+# Cursor Rules for Universe Screener
+
+
+## Architecture Rules: Dependency Injection & Testability
+
+### Core Principles
+
+**Composition Root:** All dependency wiring happens in dedicated locations—`main.py`, CLI entry points, or factory modules. Business logic classes receive their dependencies, they don't create them.
+
+**Constructor Injection:** Pass external dependencies (APIs, databases, HTTP clients, LLMs) via `__init__`. The class that *uses* a dependency should not be the class that *creates* it.
+
+**Stateless Utilities:** Pure helpers without side effects (e.g., `TickerMapper`, `pytz.UTC`, parsing functions) can be instantiated internally—no need to inject everything.
+
+**Configuration:** Pass a Settings object from the composition root. Avoid importing global config deep in the codebase. For large projects, consider a single `Settings` object passed through rather than fragmenting into many small config dataclasses.
+
+### Testability
+
+**Mock-friendly Design:** Every external dependency must be replaceable. If you can't test a class without hitting a real API, the design is wrong.
+
+**Protocols over ABCs:** Prefer `typing.Protocol` for defining interfaces—it's more Pythonic and doesn't force inheritance. Use Abstract Base Classes only when you need shared implementation or strict contract enforcement.
+
+**No Global Mutable State:** Avoid global variables for state. Read-only registries (e.g., `get_ticker_mapper()`) are acceptable as singletons.
+
+### Anti-Patterns
+```python
+# ❌ Importing config deep in business logic
+class EnsembleModule:
+    def __init__(self):
+        from ..config.settings import settings
+        self.config = settings.optimizations
+
+# ❌ Creating external clients in business logic
+class DataFetcher:
+    def __init__(self):
+        self.client = requests.Session()
+        self.db = PostgresConnection()
+
+# ❌ Global mutable state
+_cache = {}  # Module-level mutable dict
+```
+
+## Correct Patterns
+```python
+# ✅ Dependencies injected, created elsewhere
+class EnsembleModule:
+    def __init__(self, config: OptimizationsConfig):
+        self.config = config
+
+class DataFetcher:
+    def __init__(self, client: requests.Session, db: DatabaseConnection):
+        self.client = client
+        self.db = db
+
+# ✅ Composition root wires everything
+def create_app(settings: Settings) -> Application:
+    client = requests.Session()
+    db = PostgresConnection(settings.db_url)
+    fetcher = DataFetcher(client, db)
+    return Application(fetcher, settings)
+
+# ✅ Stateless utility instantiated internally (acceptable)
+class PriceAnalyzer:
+    def __init__(self):
+        self.mapper = TickerMapper()  # Pure, stateless, no I/O
+```
+
+### Testing Example
+```python
+# Easy to test because dependencies are injected
+def test_ensemble_module():
+    mock_config = OptimizationsConfig(threshold=0.5)
+    module = EnsembleModule(config=mock_config)
+    assert module.process(data) == expected
+
+def test_data_fetcher():
+    mock_client = Mock(spec=requests.Session)
+    mock_db = Mock(spec=DatabaseConnection)
+    fetcher = DataFetcher(client=mock_client, db=mock_db)
+    # Test without real network or database
+```
+
+
+
+
+
+## Project Maturity System
+
+**IMPORTANT:** Check `pyproject.toml` for current maturity level before applying rules.
+
+Expected format in pyproject.toml:
+```toml
+[tool.project]
+maturity = "EXPLORATION"  # or DEVELOPMENT, STABILIZATION, PRODUCTION
+test_strategy_generated = false
+```
+
+
+# ===== GLOBAL TEST EXECUTION RULES =====
+**Automatic Test Validation (applies to ALL maturity levels):**
+When generating or modifying any test file:
+1. ALWAYS execute: `pytest <test_file> --cov=src/universe_screener --cov-report=term --cov-report=html`
+2. This measures coverage for entire src/sa and updates htmlcov/ automatically
+3. Report coverage % for tested module AND total project coverage
+4. If coverage < target%, suggest additional test cases
+5. Never skip test execution - always validate immediately
+
+
+# ===== MATURITY DEPENDENT TEST EXECUTION RULES =====
+
+## Maturity Levels and Rules
+
+### Level 1: EXPLORATION (Just Playing)
+**Goal:** Rapid prototyping, algorithm experimentation
+**Testing:** None required
+**Cursor Behavior:**
+- No test generation unless explicitly requested
+- Focus on fast iteration
+- No enforcement of any rules
+- Mock nothing (use real APIs for exploration)
+
+### Level 2: DEVELOPMENT (Building Core)
+**Goal:** Stable core components, critical paths tested
+**Testing:** Critical financial logic only
+**Cursor Behavior:**
+- Generate tests ONLY for components marked as critical:
+  - Money/trading decision logic
+  - Signal generation
+  - Position sizing
+  - Risk management
+- Tests must cover:
+  1. Business Logic (realistic scenarios)
+  2. Edge Cases (None, empty, extremes)
+  3. Data Quality (valid ranges, no NaN/Inf)
+- Mock external APIs
+- Use deterministic seeds
+
+**Critical Component Indicators:**
+Look for: "signal", "trade", "position", "risk", "money", "pnl", "portfolio" in filenames/docstrings
+
+### Level 3: STABILIZATION (Pre-Production)
+**Goal:** Comprehensive testing, preparing for production
+**Testing:** Full test suite required
+**Cursor Behavior:**
+- Generate tests for ALL components
+- Apply all 10 test aspects (see below)
+- Create test fixtures
+- Document test coverage
+- Performance benchmarks for critical paths
+
+### Level 4: PRODUCTION (Live Trading)
+**Goal:** Maximum reliability, full enforcement
+**Testing:** Strict requirements, automated checks
+**Cursor Behavior:**
+- All STABILIZATION rules PLUS:
+- Mandatory test aspect documentation
+- Pre-commit hooks enforced
+- 80%+ coverage required
+- Security checks (no API keys in logs)
+- Integration and E2E tests
+
+## Test Strategy Generation (STABILIZATION → PRODUCTION Transition)
+
+### When User Says: "Generate test-strategy" or "I'm ready for production"
+
+**Step 1:** Check if test_strategy_generated = true in pyproject.toml
+- If true: "Test strategy already exists. Regenerate? (Y/N)"
+- If false: Proceed to questionnaire
+
+**Step 2:** Run Test Strategy Questionnaire
+
+Ask these questions IN ORDER (wait for each answer before next):
+
+#### Section 1: Project Context
+1. **Project Name & Purpose:** What does this trading system do in one sentence?
+
+2. **Current Status:** 
+   - How many months have you been working on this?
+   - Is the core algorithm finalized or still changing?
+
+3. **Timeline to Production:**
+   - When do you plan to go live? (weeks/months)
+   - Will you trade with real money or paper trading first?
+
+#### Section 2: Critical Components (MOST IMPORTANT)
+4. **Money-Critical Code:**
+   - Which files/modules directly affect buy/sell decisions?
+   - List top 3-5 most important files (e.g., src/signals/generator.py)
+
+5. **Biggest Fear:**
+   - What bug would be catastrophic? (e.g., "wrong position size", "ignoring stop loss")
+   - What keeps you up at night about this system?
+
+6. **Historical Issues:**
+   - What bugs have you encountered most frequently?
+   - Any recent "close calls" where something almost went wrong?
+
+#### Section 3: Architecture & Dependencies
+7. **External Services:**
+   - Which APIs do you use? (NewsAPI, Yahoo Finance, GDELT, etc.)
+   - Which are most unreliable/rate-limited?
+
+8. **ML Models:**
+   - Which models are in production use? (FinBERT, RoBERTa, custom models)
+   - How are they combined? (ensemble, voting, weighted average)
+
+9. **Data Sources:**
+   - Which markets/tickers? (DAX, S&P 500, crypto, specific stocks)
+   - What languages? (German news, English, both)
+   - Time granularity? (real-time, daily, hourly)
+
+#### Section 4: Testing Constraints
+10. **API Limits:**
+    - Which APIs have rate limits? (requests per day/hour)
+    - Do you have test/sandbox accounts?
+
+11. **Backtesting:**
+    - Typical backtest duration? (1 year, 5 years)
+    - How long should a backtest take? (seconds, minutes, acceptable max)
+
+12. **Test Data:**
+    - Do you have sample news/price data ready?
+    - Or should I help you create fixtures?
+
+#### Section 5: Team & Process
+13. **Team Size:**
+    - Solo project or team?
+    - If team: how many people, what's the review process?
+
+14. **CI/CD:**
+    - Using GitHub Actions, GitLab CI, or other?
+    - Or planning to set up?
+
+15. **Compliance:**
+    - Any regulatory requirements? (MiFID II, etc.)
+    - Data privacy concerns? (GDPR, personal data)
+
+**Step 3:** Automatic Code Analysis
+
+After questionnaire, Cursor analyzes:
+```
+Scanning your codebase...
+- Found X Python files in src/
+- Identified critical files: [list based on keywords + user answers]
+- External dependencies: [from requirements.txt/pyproject.toml]
+- Existing tests: [if tests/ exists, summarize coverage]
+```
+
+**Step 4:** Generate TEST_STRATEGY.md
+
+Create comprehensive document including:
+- Executive Summary (based on user's answers)
+- Critical Components List (prioritized)
+- Test Coverage Targets (per component)
+- Required Fixtures (with examples)
+- Performance Benchmarks
+- Mock Strategy
+- Security Checklist
+- Pre-Production TODO List
+
+**Step 5:** Update pyproject.toml
+Set: `test_strategy_generated = true`
+
+**Step 6:** Provide Next Steps
+```
+✅ TEST_STRATEGY.md created
+✅ Identified X critical components requiring 90%+ coverage
+✅ Generated fixtures template in tests/fixtures/
+
+Next steps:
+1. Review TEST_STRATEGY.md
+2. Start with critical tests: [prioritized list]
+3. When ready: "Generate tests for [component]"
+4. Update maturity to PRODUCTION in pyproject.toml
+```
+
+## 10 Test Aspects (Apply Based on Maturity Level)
+
+**After generating tests:**
+- ALWAYS run pytest to validate
+- Report results (passing/failing)
+- Suggest fixes if tests fail
+
+### For DEVELOPMENT (Minimal - Critical Components Only):
+1. **Business Logic Tests** - Realistic scenarios, correct outputs
+2. **Edge Cases** - None, empty, extremes
+3. **Data Quality** - Valid ranges, no NaN/Inf
+
+### For STABILIZATION (Full Test Suite):
+Add to above:
+4. **Error Handling** - API failures, timeouts, invalid inputs
+5. **Time-Dependent Logic** - Trading hours, timezones, date handling
+6. **Security & Privacy** - No API keys in logs, data masking
+7. **Performance Tests** - Batch processing, backtest speed
+8. **Idempotency & Determinism** - Same inputs → same outputs
+9. **State Management** - Cache behavior, cleanup, no leaks
+10. **Data Integration** - Multi-source consistency, deduplication
+
+### For PRODUCTION (All Above + Documentation):
+- Every test file MUST document which aspects are covered
+- Format:
+```python
+"""
+Tests for [module_name]
+
+Coverage by Test Aspect:
+✅ 1. Business Logic: test_positive_sentiment, test_signal_generation
+✅ 2. Edge Cases: test_empty_input, test_none_values
+⚠️  3. Error Handling: N/A (no external calls in this module)
+✅ 4. Data Quality: test_scores_in_range
+...
+"""
+```
+
+## Test Generation Guidelines (All Levels)
+
+### Test Naming Convention
+Format: `test_<component>_<scenario>_<expected_outcome>`
+
+Examples:
+✅ `test_ensemble_conflicting_predictions_returns_weighted_average`
+✅ `test_signal_generation_low_confidence_returns_neutral`
+❌ `test_ensemble()` (too vague)
+❌ `test_returns_float()` (tests type, not behavior)
+
+### Every Test Must Have
+1. **Docstring** explaining:
+   - SCENARIO: What situation is being tested
+   - EXPECTED: What should happen
+   - WHY: Why this matters (especially for PRODUCTION)
+
+2. **Arrange-Act-Assert** structure clearly separated
+
+3. **Meaningful assertions** (not just `assert result is not None`)
+
+### Domain-Specific Rules for Trading Systems
+
+**Financial Calculations:**
+- Ensemble weights MUST sum to 1.0 (±0.001 tolerance)
+- Scores MUST be in valid ranges: sentiment [-1, 1], confidence [0, 1]
+- Signals MUST be in range [-1, 1], if not => ask user if different logic is used.
+- No NaN, no Inf in any calculations
+- All timestamps in UTC
+
+**Deterministic Execution:**
+```python
+@pytest.fixture(autouse=True)
+def set_random_seed():
+    """Ensure all tests are deterministic."""
+    import random
+    import numpy as np
+    random.seed(42)
+    np.random.seed(42)
+```
+
+**Mock External APIs:**
+For DEVELOPMENT and above, ALWAYS mock:
+- News APIs (NewsAPI, GDELT, RSS feeds)
+- Market data (Yahoo Finance, Alpha Vantage)
+- ML model inference (unless testing model itself)
+
+Use fixtures from `tests/fixtures/`:
+- `sample_news.json` - realistic headlines
+- `sample_prices.csv` - historical OHLCV data
+- `sample_gdelt.json` - event data
+
+**Backtesting Requirements:**
+Every backtest test MUST verify:
+- Transaction costs are applied
+- No look-ahead bias (no future data leakage)
+- Proper handling of missing data days
+- Correct portfolio rebalancing
+
+### Domain-Specific Rules for Universe Screening
+
+**Filter Logic:**
+- Thresholds MUST come from config (never hard-coded)
+- Filter reasons MUST be human-readable strings
+- All filters MUST be deterministic (same input → same output)
+- Point-in-time data only (no look-ahead bias)
+
+**Performance Requirements:**
+- Batch loading preferred over sequential queries
+- DataContext size MUST be tracked (memory monitoring)
+- Filter stages SHOULD be O(n) in number of assets
+
+**Audit Trail:**
+- Every filtered asset MUST have rejection reason
+- Reduction ratios MUST be tracked per stage
+- Correlation IDs for request tracing
+
+**Type Safety:**
+- AssetClass MUST be Enum (not string)
+- All temporal values MUST use `datetime` (from datetime module), NOT `date`
+  - Use `datetime` consistently throughout the codebase
+  - Never mix `datetime.date` and `datetime.datetime`
+  - For date-only comparisons, compare `datetime` objects directly (ignore time component)
+  - Exception: `listing_date` and `delisting_date` in Asset entity use `date` (storage only)
+- All numeric thresholds MUST have units in variable names
+  (e.g., min_dollar_volume_usd, not min_volume)
+
+
+**Critical Components for Universe Screener:**
+- Filter Logic (Structural, Liquidity, DataQuality)
+- Point-in-Time Data Loading (no look-ahead)
+- Config Validation (prevent invalid thresholds)
+- Audit Trail (reproducibility)
+
+**Less Critical:**
+- Logging formatters
+- Visualization (if any)
+- CLI interfaces
+
+## What NOT to Test
+
+Skip these (all maturity levels):
+- Simple property getters: `@property def x(self): return self._x`
+- Trivial constructors with no logic
+- Third-party library internals
+- Pure logging statements (unless security-relevant)
+
+## Scenario-Driven Test Generation
+
+When asked to "write tests for X":
+
+**Step 1:** Analyze code and list scenarios
+Example: "I'll test sentiment_analyzer.py with these scenarios:
+- Positive news → score > 0.5
+- Negative news → score < -0.5
+- Empty text → score = 0.0
+- Mixed signals → weighted average
+- API rate limit → retry with backoff
+..."
+
+**Step 2:** Confirm with user (DEVELOPMENT+)
+"Does this cover your concerns? Any scenarios to add?"
+
+**Step 3:** Generate tests with explicit scenario documentation
+
+## Maturity Progression Hints
+
+**From EXPLORATION → DEVELOPMENT:**
+"Your code is growing. Consider setting maturity='DEVELOPMENT' in pyproject.toml to start testing critical components."
+
+**From DEVELOPMENT → STABILIZATION:**
+"You have X tested components. Ready for full test suite? Set maturity='STABILIZATION' and run 'generate test-strategy'."
+
+**From STABILIZATION → PRODUCTION:**
+"Tests are comprehensive. Before going live:
+1. Run 'generate test-strategy' if not done
+2. Set maturity='PRODUCTION' in pyproject.toml
+3. Enable pre-commit hooks
+4. Review all security checks"
+
+## Component-Level Maturity (Advanced - Optional)
+
+If `pyproject.toml` contains component-specific maturity:
+```toml
+[tool.project.maturity.components]
+"src/ensemble" = "PRODUCTION"
+"src/signals" = "PRODUCTION"
+"src/data_fetch" = "DEVELOPMENT"
+"src/visualization" = "EXPLORATION"
+```
+
+Apply maturity rules PER COMPONENT when generating tests.
+
+## Critical Reminders
+
+- **DEVELOPMENT:** Focus on money-critical code only
+- **STABILIZATION:** Comprehensive but flexible
+- **PRODUCTION:** Strict enforcement, no exceptions
+- **Always:** Think in scenarios, not code coverage
+- **Never:** Generate tests without clear purpose
+- **Security:** API keys NEVER in logs or test fixtures
+
+## Help Commands
+
+User can ask:
+- "What maturity level should I use?" → Explain based on project state
+- "Generate test-strategy" → Run questionnaire (STABILIZATION+)
+- "What should I test next?" → Analyze code, suggest priorities
+- "How do I transition to [LEVEL]?" → Provide checklist
+
+---
+
+**Remember:** Tests exist to prevent bugs and enable confident refactoring, not to hit coverage numbers. Quality over quantity.

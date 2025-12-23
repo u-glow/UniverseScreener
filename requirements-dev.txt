@@ -1,0 +1,63 @@
+# requirements-dev.txt - Development Dependencies
+# Universe Screener System
+
+# Include production dependencies
+-r requirements.txt
+
+# ============================================================================
+# TESTING FRAMEWORK
+# ============================================================================
+
+pytest>=7.4.0                # Test framework
+pytest-cov>=4.1.0           # Coverage reporting
+pytest-benchmark>=4.0.0     # Performance benchmarking
+pytest-asyncio>=0.21.0      # Async test support (future)
+
+# ============================================================================
+# CODE QUALITY TOOLS
+# ============================================================================
+
+# Formatting
+black>=23.12.0              # Code formatter (opinionated, zero-config)
+
+# Linting (All-in-One)
+ruff>=0.1.9                 # Fast linter (replaces flake8, isort, pyupgrade, etc.)
+
+# Type Checking
+mypy>=1.7.0                 # Static type checker
+
+# ============================================================================
+# DEVELOPMENT UTILITIES
+# ============================================================================
+
+# Code Analysis
+memory-profiler>=0.61.0     # Memory usage profiling (for optimization)
+objgraph>=3.6.0            # Memory leak detection
+
+# Pre-commit Hooks (Optional)
+pre-commit>=3.6.0          # Git hooks for automated checks
+
+# ============================================================================
+# DOCUMENTATION (Optional)
+# ============================================================================
+
+# Uncomment when building documentation:
+# sphinx>=7.2.0            # Documentation generator
+# sphinx-rtd-theme>=2.0.0  # Read the Docs theme
+
+# ============================================================================
+# JUPYTER (Optional - for experimentation)
+# ============================================================================
+
+# Uncomment for interactive development:
+# jupyter>=1.0.0           # Jupyter notebook
+# ipython>=8.18.0          # Enhanced Python shell
+
+# ============================================================================
+# NOTES
+# ============================================================================
+# - Install with: pip install -r requirements-dev.txt
+# - This automatically includes requirements.txt via -r flag
+# - Tools are configured in pyproject.toml
+# - Cursor will automatically use these tools if installed
+# - All tools work together: Black formats, Ruff lints, Mypy checks types

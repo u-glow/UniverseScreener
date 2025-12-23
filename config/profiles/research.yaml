@@ -1,0 +1,46 @@
+# Universe Screener - Research Profile
+# ====================================
+#
+# Minimal filtering for exploratory research.
+# Includes all assets that meet basic requirements.
+#
+# Use case: Data exploration, universe analysis, debugging
+
+# Minimal structural requirements
+structural_filter:
+  # Allow very young listings
+  min_listing_age_days: 30
+
+  # Include more exchanges
+  allowed_exchanges:
+    - NYSE
+    - NASDAQ
+    - XETRA
+    - LSE
+    - TSE
+
+# Minimal liquidity requirements
+liquidity_filter:
+  stock:
+    # Very low minimum volume
+    min_avg_dollar_volume_usd: 100000
+
+    # Accept sparse data
+    min_trading_days_pct: 0.50
+
+# Minimal data quality requirements
+data_quality_filter:
+  # Allow many missing days
+  max_missing_days: 20
+
+  # No news requirement
+  min_news_articles: null
+
+# Relaxed health monitoring
+health_monitoring:
+  # Don't warn on small output universe
+  min_output_universe_size: 1
+
+  # Accept high reduction ratios
+  max_reduction_ratio: 0.999
+

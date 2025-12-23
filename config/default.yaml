@@ -1,0 +1,108 @@
+# Universe Screener - Default Configuration
+# =========================================
+#
+# This is the default configuration for the screening pipeline.
+# Override specific settings by using profiles or config_override parameter.
+#
+# For aggressive/conservative settings, see profiles/ directory.
+
+version: "1.0"
+
+# Global Settings
+# ---------------
+global:
+  # Number of trading days to look back for calculations
+  default_lookback_days: 60
+
+  # Timezone for all datetime operations
+  timezone: "UTC"
+
+  # Maximum data context size in MB (for health monitoring)
+  batch_size_mb: 2000
+
+
+# Structural Filter
+# -----------------
+# Filters assets by structural properties (type, exchange, age)
+structural_filter:
+  enabled: true
+
+  # Only allow these asset types (e.g., COMMON_STOCK, ETF, ADR)
+  allowed_asset_types:
+    - COMMON_STOCK
+
+  # Only allow assets traded on these exchanges
+  allowed_exchanges:
+    - NYSE
+    - NASDAQ
+    - XETRA
+
+  # Minimum days since listing (252 = ~1 year of trading days)
+  min_listing_age_days: 252
+
+
+# Liquidity Filter
+# ----------------
+# Filters assets by tradability metrics (asset-class specific)
+liquidity_filter:
+  enabled: true
+
+  # Stock-specific settings
+  stock:
+    # Minimum average dollar volume over lookback period (USD)
+    min_avg_dollar_volume_usd: 5000000
+
+    # Minimum percentage of trading days with data (0.0 - 1.0)
+    min_trading_days_pct: 0.95
+
+    # Lookback period for calculations
+    lookback_days: 60
+
+  # Crypto-specific settings (future)
+  crypto:
+    # Maximum acceptable slippage for 100k order
+    max_slippage_pct: 0.5
+
+    # Minimum order book depth (USD)
+    min_order_book_depth_usd: 100000
+
+  # Forex-specific settings (future)
+  forex:
+    # Maximum average spread in pips
+    max_spread_pips: 3.0
+
+
+# Data Quality Filter
+# -------------------
+# Filters assets by data availability
+data_quality_filter:
+  enabled: true
+
+  # Maximum missing days in lookback window
+  max_missing_days: 3
+
+  # Minimum news articles (null = disabled)
+  min_news_articles: null
+
+  # Lookback period for quality checks
+  lookback_days: 60
+
+
+# Health Monitoring
+# -----------------
+# System health checks and thresholds
+health_monitoring:
+  enabled: true
+
+  # Maximum RAM usage percentage before warning
+  max_ram_usage_pct: 80.0
+
+  # Maximum data context size in MB
+  max_context_size_mb: 2000
+
+  # Minimum output universe size (alert if below)
+  min_output_universe_size: 10
+
+  # Maximum reduction ratio (alert if filtering removes more than this %)
+  max_reduction_ratio: 0.99
+

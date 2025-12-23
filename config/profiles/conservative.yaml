@@ -1,0 +1,38 @@
+# Universe Screener - Conservative Profile
+# =========================================
+#
+# Strict filtering criteria for maximum safety.
+# Results in smaller, more liquid universe.
+#
+# Use case: Production trading, risk-averse strategies
+
+# Stricter structural requirements
+structural_filter:
+  # Require longer listing history
+  min_listing_age_days: 504  # ~2 years
+
+# Higher liquidity thresholds
+liquidity_filter:
+  stock:
+    # Higher minimum dollar volume
+    min_avg_dollar_volume_usd: 10000000
+
+    # Stricter trading days requirement
+    min_trading_days_pct: 0.98
+
+  crypto:
+    # Lower slippage tolerance
+    max_slippage_pct: 0.25
+
+  forex:
+    # Tighter spread requirement
+    max_spread_pips: 2.0
+
+# Stricter data quality
+data_quality_filter:
+  # Allow fewer missing days
+  max_missing_days: 1
+
+  # Require news coverage for sentiment analysis
+  min_news_articles: 20
+

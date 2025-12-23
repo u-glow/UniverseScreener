@@ -1,0 +1,39 @@
+# requirements.txt - Production Dependencies
+# Universe Screener System
+
+# ============================================================================
+# CORE DEPENDENCIES
+# ============================================================================
+
+# Configuration & Data Validation
+pydantic>=2.5.0          # Type-safe config and data models
+pyyaml>=6.0.1            # YAML config file parsing
+
+# Date/Time Handling
+python-dateutil>=2.8.2   # Robust date parsing and manipulation
+
+# ============================================================================
+# OPTIONAL DEPENDENCIES (Add when needed)
+# ============================================================================
+
+# Uncomment when integrating real data sources:
+# pandas>=2.1.0          # Data manipulation (for market data)
+# numpy>=1.24.0          # Numerical operations
+
+# Uncomment when adding observability:
+# structlog>=23.2.0      # Structured logging
+
+# Uncomment when adding metrics:
+# prometheus-client>=0.19.0  # Metrics export
+
+# Uncomment for database integration:
+# sqlalchemy>=2.0.0      # Database ORM
+# psycopg2-binary>=2.9.0 # PostgreSQL adapter (if using PostgreSQL)
+
+# ============================================================================
+# NOTES
+# ============================================================================
+# - Keep this minimal for MVP (only what's needed)
+# - Add dependencies incrementally as features are implemented
+# - Version pins ensure reproducible builds
+# - Use `pip install -r requirements.txt` to install
