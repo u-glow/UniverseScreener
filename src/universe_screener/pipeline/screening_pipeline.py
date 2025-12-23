@@ -2,10 +2,12 @@
 Screening Pipeline - Main Orchestrator.
 
 The ScreeningPipeline coordinates the entire screening workflow.
+Includes resilience and validation layers (Phase 1).
 """
 
 from __future__ import annotations
 
+import logging
 import time
 import uuid
 from datetime import datetime, timedelta
@@ -18,8 +20,17 @@ from universe_screener.domain.entities import (
     ScreeningResult,
     StageResult,
 )
+from universe_screener.domain.value_objects import (
+    MarketData,
+    MarketDataDict,
+    MetadataDict,
+    QualityMetrics,
+    QualityMetricsDict,
+)
 from universe_screener.pipeline.data_context import DataContext
 from universe_screener.config.models import ScreeningConfig
+
+logger = logging.getLogger(__name__)
 
 
 class UniverseProviderProtocol(Protocol):
@@ -30,17 +41,17 @@ class UniverseProviderProtocol(Protocol):
 
     def bulk_load_market_data(
         self, assets: List[Asset], start_date: datetime, end_date: datetime
-    ) -> Dict[str, Any]:
+    ) -> MarketDataDict:
         ...
 
     def bulk_load_metadata(
         self, assets: List[Asset], date: datetime
-    ) -> Dict[str, Any]:
+    ) -> MetadataDict:
         ...
 
     def check_data_availability(
         self, assets: List[Asset], date: datetime, lookback_days: int
-    ) -> Dict[str, Any]:
+    ) -> QualityMetricsDict:
         ...
 
 
@@ -80,6 +91,11 @@ class AuditLoggerProtocol(Protocol):
     def log_asset_filtered(self, asset: Asset, stage_name: str, reason: str) -> None:
         ...
 
+    def log_anomaly(
+        self, message: str, severity: str, context: Optional[Dict] = None
+    ) -> None:
+        ...
+
 
 class MetricsCollectorProtocol(Protocol):
     """Protocol for metrics collectors."""
@@ -103,6 +119,32 @@ class MetricsCollectorProtocol(Protocol):
         ...
 
 
+class ErrorHandlerProtocol(Protocol):
+    """Protocol for error handlers."""
+
+    def retry(self, func: Any, operation_name: str) -> Any:
+        ...
+
+    def with_circuit_breaker(self, func: Any, circuit_name: str) -> Any:
+        ...
+
+
+class RequestValidatorProtocol(Protocol):
+    """Protocol for request validators."""
+
+    def validate(self, request: ScreeningRequest, config: ScreeningConfig) -> None:
+        ...
+
+
+class DataValidatorProtocol(Protocol):
+    """Protocol for data validators."""
+
+    def validate_all(
+        self, market_data: MarketDataDict, metadata: MetadataDict
+    ) -> Any:
+        ...
+
+
 class ScreeningPipeline:
     """Main orchestrator for the screening workflow."""
 
@@ -113,6 +155,9 @@ class ScreeningPipeline:
         config: ScreeningConfig,
         audit_logger: AuditLoggerProtocol,
         metrics_collector: MetricsCollectorProtocol,
+        error_handler: Optional[ErrorHandlerProtocol] = None,
+        request_validator: Optional[RequestValidatorProtocol] = None,
+        data_validator: Optional[DataValidatorProtocol] = None,
     ) -> None:
         """
         Initialize pipeline with all dependencies.
@@ -123,12 +168,18 @@ class ScreeningPipeline:
             config: Screening configuration
             audit_logger: For audit trail
             metrics_collector: For performance metrics
+            error_handler: For retry/circuit breaker (optional, Phase 1)
+            request_validator: For request validation (optional, Phase 1)
+            data_validator: For data validation (optional, Phase 1)
         """
         self.provider = provider
         self.filters = filters
         self.config = config
         self.audit_logger = audit_logger
         self.metrics_collector = metrics_collector
+        self.error_handler = error_handler
+        self.request_validator = request_validator
+        self.data_validator = data_validator
 
     def screen(
         self,
@@ -146,6 +197,11 @@ class ScreeningPipeline:
 
         Returns:
             ScreeningResult with filtered assets and audit trail
+
+        Raises:
+            ValidationError: If request validation fails
+            RetryExhausted: If data loading fails after retries
+            CircuitBreakerOpen: If provider circuit is open
         """
         start_time = time.perf_counter()
         correlation_id = str(uuid.uuid4())
@@ -159,10 +215,28 @@ class ScreeningPipeline:
             correlation_id=correlation_id,
         )
 
-        # 2. Load data
+        # 2. Validate request (Phase 1)
+        if self.request_validator:
+            self.request_validator.validate(request, self.config)
+            logger.debug(f"Request validated: {correlation_id}")
+
+        # 3. Load data (with optional error handling)
         context = self._load_data(request)
 
-        # 3. Execute filters
+        # 4. Validate data (Phase 1)
+        if self.data_validator:
+            validation_result = self.data_validator.validate_all(
+                context._market_data, context._metadata
+            )
+            if validation_result.has_issues:
+                self.audit_logger.log_anomaly(
+                    f"Data validation: {len(validation_result.warnings)} warnings, "
+                    f"{len(validation_result.errors)} errors",
+                    severity="WARNING" if validation_result.is_valid else "ERROR",
+                    context={"outliers": len(validation_result.outliers)},
+                )
+
+        # 5. Execute filters
         current_assets = context.assets
         audit_trail: List[StageResult] = []
 
@@ -172,7 +246,7 @@ class ScreeningPipeline:
             )
             audit_trail.append(stage_result)
 
-        # 4. Record total time
+        # 6. Record total time
         total_duration = time.perf_counter() - start_time
         self.metrics_collector.record_timing(
             "screening_total_seconds",
@@ -180,7 +254,7 @@ class ScreeningPipeline:
             {"asset_class": asset_class.value},
         )
 
-        # 5. Build result
+        # 7. Build result
         return ScreeningResult(
             request=request,
             input_universe=context.assets,
@@ -194,17 +268,39 @@ class ScreeningPipeline:
         """Bulk load data into DataContext."""
         load_start = time.perf_counter()
 
-        # Get assets
-        assets = self.provider.get_assets(request.date, request.asset_class)
-
         # Calculate date range
         lookback_days = self.config.global_settings.default_lookback_days
         start_date = request.date - timedelta(days=lookback_days)
         end_date = request.date
 
-        # Bulk load all data
-        market_data = self.provider.bulk_load_market_data(assets, start_date, end_date)
-        metadata = self.provider.bulk_load_metadata(assets, request.date)
+        # Get assets (with optional retry/circuit breaker)
+        if self.error_handler:
+            assets = self.error_handler.retry(
+                lambda: self.provider.get_assets(request.date, request.asset_class),
+                operation_name="get_assets",
+            )
+        else:
+            assets = self.provider.get_assets(request.date, request.asset_class)
+
+        # Bulk load market data (with optional retry)
+        if self.error_handler:
+            market_data = self.error_handler.with_circuit_breaker(
+                lambda: self.provider.bulk_load_market_data(assets, start_date, end_date),
+                circuit_name="market_data_provider",
+            )
+        else:
+            market_data = self.provider.bulk_load_market_data(assets, start_date, end_date)
+
+        # Bulk load metadata
+        if self.error_handler:
+            metadata = self.error_handler.retry(
+                lambda: self.provider.bulk_load_metadata(assets, request.date),
+                operation_name="bulk_load_metadata",
+            )
+        else:
+            metadata = self.provider.bulk_load_metadata(assets, request.date)
+
+        # Check data availability
         quality_metrics = self.provider.check_data_availability(
             assets, request.date, lookback_days
         )
@@ -280,5 +376,5 @@ class ScreeningPipeline:
             "correlation_id": correlation_id,
             "timestamp": datetime.now().isoformat(),
             "duration_seconds": duration,
-            "version": "0.1.0",
+            "version": "0.2.0",  # Phase 1 with resilience
         }

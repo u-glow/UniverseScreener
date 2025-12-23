@@ -28,7 +28,36 @@ Example:
 
 """
 
-__version__ = "0.1.0"
+import logging
 
-# TODO: Implement - Export main components after implementation
+__version__ = "0.2.0"  # Phase 1 with resilience
 
+
+def configure_logging(
+    level: int = logging.INFO,
+    format: str = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+) -> None:
+    """
+    Configure logging for Universe Screener.
+
+    Call this at application startup to see log messages.
+    By default, only WARNING and above are visible.
+
+    Args:
+        level: Logging level (default: INFO)
+        format: Log message format
+
+    Example:
+        >>> import universe_screener
+        >>> universe_screener.configure_logging(logging.DEBUG)
+    """
+    logging.basicConfig(
+        level=level,
+        format=format,
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    # Set our package's logger
+    logging.getLogger("universe_screener").setLevel(level)
+
+
+# TODO: Export main components after implementation
