@@ -106,3 +106,19 @@ health_monitoring:
   # Maximum reduction ratio (alert if filtering removes more than this %)
   max_reduction_ratio: 0.99
 
+
+# Cache Configuration
+# -------------------
+# Settings for caching layer (reduces redundant data fetches)
+cache:
+  enabled: true
+
+  # Maximum cache size in MB (default 1 GB)
+  max_size_mb: 1024
+
+  # Default time-to-live for cache entries in seconds (1 hour)
+  default_ttl_seconds: 3600.0
+
+  # Log cache hits/misses (for debugging)
+  log_access: false
+

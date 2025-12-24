@@ -41,7 +41,7 @@ dev = [
 # ============================================================================
 
 [tool.project]
-maturity = "DEVELOPMENT"  # Change this as your project matures
+maturity = "STABILIZATION"  # Change this as your project matures
 
 # Set to true after running "generate test-strategy" command in Cursor
 test_strategy_generated = false

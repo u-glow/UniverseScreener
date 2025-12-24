@@ -23,12 +23,21 @@ class AssetClass(str, Enum):
 
 
 class AssetType(str, Enum):
-    """Type of stock asset."""
+    """Type of financial asset."""
 
+    # Stock types
     COMMON_STOCK = "COMMON_STOCK"
     ETF = "ETF"
     ADR = "ADR"
     PREFERRED = "PREFERRED"
+    
+    # Crypto types
+    CRYPTO = "CRYPTO"
+    STABLECOIN = "STABLECOIN"
+    
+    # Forex types
+    FOREX_PAIR = "FOREX_PAIR"
+    FOREX_CROSS = "FOREX_CROSS"
 
 
 class Asset(BaseModel):

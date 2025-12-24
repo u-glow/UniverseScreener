@@ -1,0 +1,197 @@
+# =============================================================================
+# Universe Screener - .gitignore
+# =============================================================================
+
+# =============================================================================
+# Python
+# =============================================================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# =============================================================================
+# Virtual Environments
+# =============================================================================
+venv/
+ENV/
+env/
+.venv/
+.env/
+
+# =============================================================================
+# Testing
+# =============================================================================
+
+# pytest
+.pytest_cache/
+*.pytest_cache/
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Test reports
+test_report*.txt
+test-results/
+
+# =============================================================================
+# IDEs and Editors
+# =============================================================================
+
+# VSCode / Cursor
+.vscode/
+.cursor/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Spyder
+.spyderproject
+.spyproject
+
+# Rope
+.ropeproject
+
+# =============================================================================
+# OS Files
+# =============================================================================
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# =============================================================================
+# Project Specific
+# =============================================================================
+
+# Configuration with secrets (use .env.example as template)
+.env
+.env.local
+.env.*.local
+secrets.yaml
+secrets.yml
+
+# Local config overrides
+config/local.yaml
+config/local/
+
+# Cache directories
+.cache/
+cache/
+
+# Logs
+logs/
+*.log
+
+# Data files (large, not for version control)
+data/
+*.csv
+*.parquet
+*.h5
+*.hdf5
+
+# Model files
+models/
+*.pkl
+*.pickle
+*.joblib
+
+# =============================================================================
+# Build & Documentation
+# =============================================================================
+
+# Sphinx documentation
+docs/_build/
+
+# mkdocs
+site/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Ruff
+.ruff_cache/
+
+# pytype
+.pytype/
+
+# =============================================================================
+# Misc
+# =============================================================================
+
+# Backup files
+*.bak
+*.swp
+*.swo
+*~
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+

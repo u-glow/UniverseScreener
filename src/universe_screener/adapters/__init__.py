@@ -24,5 +24,19 @@ Design Principles:
     - No business logic in adapters
 """
 
-# TODO: Implement - Export adapter classes after implementation
+from universe_screener.adapters.mock_provider import MockUniverseProvider
+from universe_screener.adapters.cached_provider import CachedUniverseProvider
+from universe_screener.adapters.console_logger import ConsoleAuditLogger
+from universe_screener.adapters.metrics_collector import InMemoryMetricsCollector
+
+# Alias for backward compatibility
+SimpleMetricsCollector = InMemoryMetricsCollector
+
+__all__ = [
+    "MockUniverseProvider",
+    "CachedUniverseProvider",
+    "ConsoleAuditLogger",
+    "InMemoryMetricsCollector",
+    "SimpleMetricsCollector",
+]
 

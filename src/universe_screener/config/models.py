@@ -79,6 +79,15 @@ class HealthMonitorConfig(BaseModel):
     max_reduction_ratio: float = Field(default=0.99, ge=0, le=1)
 
 
+class CacheConfig(BaseModel):
+    """Configuration for caching layer."""
+
+    enabled: bool = True
+    max_size_mb: int = Field(default=1024, ge=100)  # 1 GB default
+    default_ttl_seconds: float = Field(default=3600.0, ge=0)  # 1 hour
+    log_access: bool = Field(default=False)
+
+
 class ScreeningConfig(BaseModel):
     """Root configuration object."""
 
@@ -98,6 +107,9 @@ class ScreeningConfig(BaseModel):
     )
     health_monitoring: HealthMonitorConfig = Field(
         default_factory=HealthMonitorConfig,
+    )
+    cache: CacheConfig = Field(
+        default_factory=CacheConfig,
     )
 
     model_config = {"populate_by_name": True}

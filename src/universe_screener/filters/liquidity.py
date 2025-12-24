@@ -3,82 +3,42 @@ Liquidity Filter Implementation.
 
 Filters assets based on tradability metrics. Uses the Strategy Pattern
 to support different liquidity checks per asset class.
+
+Supported Asset Classes:
+    - STOCK: Dollar volume, trading days
+    - CRYPTO: Order book depth, slippage
+    - FOREX: Spread in pips, 24/5 availability
 """
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import TYPE_CHECKING, Dict, List, Protocol, Tuple
 
 from universe_screener.domain.entities import Asset, AssetClass
 from universe_screener.domain.value_objects import FilterResult, MarketData
-from universe_screener.config.models import LiquidityFilterConfig, StockLiquidityConfig
+from universe_screener.config.models import LiquidityFilterConfig
+from universe_screener.filters.liquidity_strategies import (
+    StockLiquidityStrategy,
+    CryptoLiquidityStrategy,
+    ForexLiquidityStrategy,
+    LiquidityStrategy,
+)
 
 if TYPE_CHECKING:
     from universe_screener.pipeline.data_context import DataContext
 
-
-class LiquidityStrategy(Protocol):
-    """Strategy protocol for asset-class specific liquidity checks."""
-
-    def check_liquidity(
-        self,
-        asset: Asset,
-        market_data: List[MarketData],
-    ) -> Tuple[bool, str]:
-        """Check if asset meets liquidity requirements."""
-        ...
-
-
-class StockLiquidityStrategy:
-    """Liquidity strategy for stocks."""
-
-    def __init__(self, config: StockLiquidityConfig) -> None:
-        self.config = config
-
-    def check_liquidity(
-        self,
-        asset: Asset,
-        market_data: List[MarketData],
-    ) -> Tuple[bool, str]:
-        """
-        Check stock liquidity.
-
-        Metrics:
-            - Average dollar volume over lookback period
-            - Percentage of trading days with data
-        """
-        if not market_data:
-            return False, "no market data available"
-
-        # Calculate average dollar volume
-        dollar_volumes = [d.dollar_volume for d in market_data]
-        avg_dollar_volume = sum(dollar_volumes) / len(dollar_volumes)
-
-        # Calculate trading days percentage
-        # Assume 252 trading days per year, proportional for lookback
-        expected_days = int(self.config.lookback_days * (252 / 365))
-        actual_days = len(market_data)
-        trading_days_pct = actual_days / expected_days if expected_days > 0 else 0
-
-        # Check thresholds
-        if avg_dollar_volume < self.config.min_avg_dollar_volume_usd:
-            return (
-                False,
-                f"avg_dollar_volume=${avg_dollar_volume:,.0f} < min=${self.config.min_avg_dollar_volume_usd:,.0f}",
-            )
-
-        if trading_days_pct < self.config.min_trading_days_pct:
-            return (
-                False,
-                f"trading_days_pct={trading_days_pct:.2%} < min={self.config.min_trading_days_pct:.2%}",
-            )
-
-        return True, ""
+logger = logging.getLogger(__name__)
 
 
 class LiquidityFilter:
-    """Filter assets by liquidity metrics."""
+    """
+    Filter assets by liquidity metrics.
+    
+    Uses Strategy Pattern to apply asset-class specific liquidity checks.
+    Strategies are injected via config and can be extended for new asset classes.
+    """
 
     def __init__(self, config: LiquidityFilterConfig) -> None:
         """
@@ -90,6 +50,8 @@ class LiquidityFilter:
         self.config = config
         self._strategies: Dict[AssetClass, LiquidityStrategy] = {
             AssetClass.STOCK: StockLiquidityStrategy(config.stock),
+            AssetClass.CRYPTO: CryptoLiquidityStrategy(config.crypto),
+            AssetClass.FOREX: ForexLiquidityStrategy(config.forex),
         }
 
     @property
