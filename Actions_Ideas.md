@@ -1,7 +1,7 @@
 # Actions & Ideas - Universe Screener
 
 **Stand:** 2024-12-24
-**Maturity:** DEVELOPMENT
+**Maturity:** STABILIZATION
 **Version:** 0.4.0
 
 ---
@@ -76,6 +76,48 @@ Uncovered: Optionale Dependency-Pfade (wenn error_handler, validators nicht inje
 
 ---
 
+## 🟠 Documentation TODOs
+
+### 1. GitHub Actions / CI einrichten
+**Priorität:** MEDIUM (vor Production)
+**Dateien:** `.github/workflows/tests.yml`
+
+README.md enthält TODO-Kommentar für CI-Badges:
+```markdown
+<!-- TODO: Replace with CI badges when GitHub Actions configured -->
+[![Tests](https://github.com/your-org/universe-screener/actions/workflows/tests.yml/badge.svg)]
+```
+
+**Aktion:**
+- [ ] GitHub Actions Workflow erstellen
+- [ ] Tests automatisch bei Push/PR laufen lassen
+- [ ] Codecov Integration für Coverage-Badge
+- [ ] Badge URLs in README aktualisieren
+
+---
+
+### 2. Repository URL anpassen
+**Priorität:** LOW
+**Dateien:** `README.md`, `docs/DEPLOYMENT.md`, `CHANGELOG.md`
+
+Aktuell Placeholder: `your-org/universe-screener`
+
+**Aktion:** Bei Veröffentlichung durch echte GitHub URL ersetzen.
+
+---
+
+### 3. Erweiterte Beispiele / Tutorials
+**Priorität:** LOW
+**Datei:** `docs/TUTORIALS.md` (neu)
+
+Ideen:
+- [ ] Tutorial: Custom Filter erstellen
+- [ ] Tutorial: Crypto-Screening Setup
+- [ ] Tutorial: Backtest-Integration
+- [ ] Example Scripts in `examples/` Ordner
+
+---
+
 ## 🔵 Nächste Phasen (Roadmap)
 
 ### Phase 4: Extensibility (noch nicht gestartet)
@@ -128,6 +170,16 @@ await cached_provider.warm_cache(symbols, date_range)
 ---
 
 ## ✅ Abgeschlossen
+
+### Session 2024-12-24: Production-Ready Dokumentation
+- [x] **README.md** - Komplett neu (Quick Start, Architecture, Testing, Badges)
+- [x] **docs/DEPLOYMENT.md** - Step-by-step Deployment Guide
+- [x] **docs/PERFORMANCE.md** - Benchmarks, Cache-Tuning, Memory
+- [x] **docs/API_REFERENCE.md** - Alle Komponenten dokumentiert
+- [x] **CHANGELOG.md** - Versionshistorie (0.1.0 → 0.4.0)
+- [x] **LICENSE** - MIT License
+- [x] Badge-URLs mit Anker-Links (funktionieren ohne CI)
+- [x] DatabaseProvider Klarstellung in Deployment-Guide
 
 ### Session 2024-12-24: Phase 3 - Scalability Layer
 - [x] **CacheManager** mit TTL, LRU, Thread-Safety (94.63% Coverage)
