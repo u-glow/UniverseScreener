@@ -6,7 +6,7 @@ All configuration is validated at load time using Pydantic.
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -88,6 +88,31 @@ class CacheConfig(BaseModel):
     log_access: bool = Field(default=False)
 
 
+class FilterRegistryConfig(BaseModel):
+    """Configuration for dynamic filter registry."""
+
+    enabled: bool = True
+    enabled_filters: List[str] = Field(
+        default_factory=lambda: ["structural", "liquidity", "data_quality"]
+    )
+    filter_configs: Dict[str, Any] = Field(default_factory=dict)
+
+
+class DerivativeConfig(BaseModel):
+    """Configuration for derivative instrument resolution."""
+
+    enabled: bool = False
+    instrument_types: List[str] = Field(
+        default_factory=lambda: ["CFD", "TURBO"]
+    )
+    min_leverage: float = Field(default=5.0, ge=1.0)
+    max_leverage: float = Field(default=20.0, ge=1.0)
+    brokers: List[str] = Field(
+        default_factory=lambda: ["Interactive Brokers"]
+    )
+    max_trading_costs_pct: float = Field(default=0.5, ge=0)
+
+
 class ScreeningConfig(BaseModel):
     """Root configuration object."""
 
@@ -110,6 +135,12 @@ class ScreeningConfig(BaseModel):
     )
     cache: CacheConfig = Field(
         default_factory=CacheConfig,
+    )
+    filter_registry: FilterRegistryConfig = Field(
+        default_factory=FilterRegistryConfig,
+    )
+    derivatives: DerivativeConfig = Field(
+        default_factory=DerivativeConfig,
     )
 
     model_config = {"populate_by_name": True}

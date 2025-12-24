@@ -2,7 +2,7 @@
 
 **Stand:** 2024-12-24
 **Maturity:** STABILIZATION
-**Version:** 0.4.0
+**Version:** 0.5.0
 
 ---
 
@@ -68,11 +68,24 @@ Lazy Loading ist implementiert aber nur 64% getestet. Fehlende Tests:
 **Grund:** Abstrakte Protokolle ohne Implementierung.
 **Aktion:** Akzeptabel - Protokolle sind nur Type Hints.
 
-### Pipeline Uncovered Paths (~77% Coverage)
+### Pipeline Uncovered Paths (~78% Coverage)
 **Datei:** `src/universe_screener/pipeline/screening_pipeline.py`
 
 Uncovered: Optionale Dependency-Pfade (wenn error_handler, validators nicht injected).
 **Aktion:** Integration-Tests mit allen optionalen Dependencies hinzufügen.
+
+### DerivativeResolver Filter Branches (~85% Coverage)
+**Datei:** `src/universe_screener/derivatives/derivative_resolver.py`
+**Lines:** 56, 60, 64-66, 70-73
+
+Uncovered Filter-Branches in `InstrumentFilter.matches()`:
+- Line 56: `broker not in self.brokers` 
+- Line 60: `trading_costs > max_trading_costs`
+- Lines 64-66: `require_short_selling` Filter
+- Lines 70-73: `exclude_expiring_within_days` Filter
+
+**Grund:** Selten genutzte Edge-Cases, Haupt-Logik ist getestet.
+**Aktion:** Bei Bedarf Edge-Case Tests hinzufügen (Low Priority).
 
 ---
 
@@ -120,17 +133,16 @@ Ideen:
 
 ## 🔵 Nächste Phasen (Roadmap)
 
-### Phase 4: Extensibility (noch nicht gestartet)
-Gemäß `docs/architecture/04_implementation_roadmap.md`:
-- FilterRegistry für dynamische Filter-Registrierung
-- Config-driven Filter-Aktivierung
-- Plugin-System für Custom Filters
-- Builder Pattern für Pipeline-Konstruktion
-
 ### Phase 5: Async Migration (optional)
 - `async def` für Provider-Methoden
 - Parallele Filter-Ausführung
 - Async Event Bus
+
+### Phase 6: Production Hardening
+- Prometheus Metrics Export
+- Kubernetes Health Endpoints
+- Circuit Breaker Dashboard
+- Rate Limiting für API Provider
 
 ---
 
@@ -171,12 +183,24 @@ await cached_provider.warm_cache(symbols, date_range)
 
 ## ✅ Abgeschlossen
 
+### Session 2024-12-24: Phase 4 - Extensibility Layer
+- [x] **FilterRegistry** mit register/unregister/enable/disable (94.81% Coverage)
+- [x] **DerivativeResolver** für Underlyings → Tradable Instruments (84.68% Coverage)
+- [x] **CFDResolver** mit Leverage/Spread-Berechnung (96.73% Coverage)
+- [x] **TurboResolver** mit Knockout-Levels (96.73% Coverage)
+- [x] **FutureResolver** mit Expiry-Berechnung (96.73% Coverage)
+- [x] **TradableInstrument Entity** + InstrumentType Enum
+- [x] **Pipeline Update**: Union[List, FilterRegistry], Optional DerivativeResolver
+- [x] **Config Extensions**: FilterRegistryConfig, DerivativeConfig
+- [x] 291 Tests (Unit, Integration, Performance)
+- [x] 89.07% Code Coverage
+
 ### Session 2024-12-24: Production-Ready Dokumentation
 - [x] **README.md** - Komplett neu (Quick Start, Architecture, Testing, Badges)
 - [x] **docs/DEPLOYMENT.md** - Step-by-step Deployment Guide
 - [x] **docs/PERFORMANCE.md** - Benchmarks, Cache-Tuning, Memory
 - [x] **docs/API_REFERENCE.md** - Alle Komponenten dokumentiert
-- [x] **CHANGELOG.md** - Versionshistorie (0.1.0 → 0.4.0)
+- [x] **CHANGELOG.md** - Versionshistorie (0.1.0 → 0.5.0)
 - [x] **LICENSE** - MIT License
 - [x] Badge-URLs mit Anker-Links (funktionieren ohne CI)
 - [x] DatabaseProvider Klarstellung in Deployment-Guide
@@ -206,10 +230,17 @@ await cached_provider.warm_cache(symbols, date_range)
 
 ## 📊 Coverage-Trend
 
-| Phase | Tests | Coverage | Performance |
-|-------|-------|----------|-------------|
-| Phase 2 | 131 | 89.34% | 5000 assets/0.09s |
-| Phase 3 | 203 | 87.98% | Cached 2nd run <1s |
+| Phase | Tests | Coverage | Time | Notes |
+|-------|-------|----------|------|-------|
+| Phase 2 | 131 | 89.34% | 3.5s | 5000 assets/0.09s |
+| Phase 3 | 203 | 87.98% | 6.9s | Cached 2nd run <1s |
+| Phase 4 | 291 | 89.07% | 10.6s | +Registry +Derivatives |
+
+**Performance Note (Phase 4):** 
+- 291 Tests in 10.6s = ~36ms/Test
+- Phase 3: 203 Tests in 6.9s = ~34ms/Test
+- Leicht langsamer durch Derivative Mapping + Registry Setup
+- **Impact:** Low (immer noch schnell)
 
 ---
 

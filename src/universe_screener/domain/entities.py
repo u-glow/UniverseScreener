@@ -113,6 +113,10 @@ class ScreeningResult(BaseModel):
     audit_trail: List[StageResult] = Field(default_factory=list)
     metrics: Dict[str, Any] = Field(default_factory=dict)
     metadata: Dict[str, Any] = Field(default_factory=dict)
+    tradable_instruments: Optional[Dict[str, List[Any]]] = Field(
+        default=None,
+        description="Derivative instruments mapped from underlyings (Phase 4)",
+    )
 
     @property
     def total_reduction_ratio(self) -> float:
@@ -120,3 +124,15 @@ class ScreeningResult(BaseModel):
         if len(self.input_universe) == 0:
             return 0.0
         return 1.0 - (len(self.output_universe) / len(self.input_universe))
+
+    @property
+    def has_tradable_instruments(self) -> bool:
+        """Check if tradable instruments are available."""
+        return self.tradable_instruments is not None and len(self.tradable_instruments) > 0
+
+    @property
+    def tradable_instruments_count(self) -> int:
+        """Count total tradable instruments."""
+        if not self.tradable_instruments:
+            return 0
+        return sum(len(v) for v in self.tradable_instruments.values())

@@ -7,6 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.0] - 2024-12-24
+
+### Phase 4: Extensibility Layer
+
+Major release focused on dynamic filter management and derivative instrument resolution.
+
+### Added
+
+- **FilterRegistry** (`src/universe_screener/registry/filter_registry.py`)
+  - Dynamic filter registration with `register()`, `unregister()`
+  - Enable/disable filters at runtime with `enable_filters()`, `disable_filter()`
+  - Version tracking per filter with `get_version()`, `get_versions()`
+  - Custom factory support with `register_with_factory()`
+  - Thread-safe with RLock
+  - Config update support with `update_config()`
+
+- **DerivativeResolver** (`src/universe_screener/derivatives/`)
+  - Maps underlyings to tradable instruments (CFD, Turbo, Future)
+  - `InstrumentFilter` for filtering by type, leverage, broker, costs
+  - `get_tradable_instruments()` and `get_best_instrument()`
+  - Strategy Pattern for extensibility
+
+- **CFDResolver** (`src/universe_screener/derivatives/strategies.py`)
+  - Mock CFD resolution for stocks, crypto, forex
+  - Leverage calculation by asset class
+  - Spread calculation
+
+- **TurboResolver** (`src/universe_screener/derivatives/strategies.py`)
+  - Knockout certificate resolution
+  - Long/Short with multiple leverage levels
+  - Expiry date calculation
+
+- **FutureResolver** (`src/universe_screener/derivatives/strategies.py`)
+  - Exchange-traded futures resolution
+  - Multiple expiry months
+  - Contract code generation
+
+- **TradableInstrument Entity** (`src/universe_screener/derivatives/entities.py`)
+  - Complete instrument representation
+  - Leverage, margin, knockout, expiry support
+  - Metadata for broker-specific info
+
+- **InstrumentType Enum**
+  - CFD, TURBO, FUTURE, OPTION, WARRANT, MINI_FUTURE, ETF
+
+- **Configuration Extensions**
+  - `FilterRegistryConfig` with `enabled_filters` list
+  - `DerivativeConfig` with instrument types, leverage range, brokers
+
+- **Pipeline Extensions**
+  - `ScreeningPipeline` accepts `Union[List[FilterStage], FilterRegistry]`
+  - Optional `derivative_resolver` parameter
+  - `ScreeningResult.tradable_instruments` field
+
+- **New Test Suites**
+  - `tests/unit/test_filter_registry.py` (23 tests)
+  - `tests/unit/test_derivative_resolver.py` (18 tests)
+  - `tests/unit/test_cfd_resolver.py` (17 tests)
+  - `tests/unit/test_turbo_resolver.py` (14 tests)
+  - `tests/integration/test_pipeline_with_registry.py` (8 tests)
+  - `tests/integration/test_end_to_end_with_derivatives.py` (8 tests)
+
+### Changed
+
+- ScreeningPipeline now supports FilterRegistry (backwards compatible with list)
+- ScreeningResult includes optional `tradable_instruments`
+- Version bumped to 0.5.0
+
+### Performance
+
+- 291 tests passing
+- 89.07% code coverage
+
+---
+
 ## [0.4.0] - 2024-12-24
 
 ### Phase 3: Scalability Layer

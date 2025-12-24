@@ -2,7 +2,7 @@
 Screening Pipeline - Main Orchestrator.
 
 The ScreeningPipeline coordinates the entire screening workflow.
-Includes resilience (Phase 1) and observability (Phase 2) layers.
+Includes resilience (Phase 1), observability (Phase 2), and extensibility (Phase 4) layers.
 """
 
 from __future__ import annotations
@@ -11,7 +11,11 @@ import logging
 import time
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Dict, List, Optional, Protocol, Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from universe_screener.registry.filter_registry import FilterRegistry
+    from universe_screener.derivatives.derivative_resolver import DerivativeResolver
 
 from universe_screener.domain.entities import (
     Asset,
@@ -180,13 +184,32 @@ class VersionManagerProtocol(Protocol):
         ...
 
 
+class FilterRegistryProtocol(Protocol):
+    """Protocol for filter registries (Phase 4)."""
+
+    def get_enabled_filters(self) -> List[Any]:
+        ...
+
+    def get_versions(self) -> Dict[str, str]:
+        ...
+
+
+class DerivativeResolverProtocol(Protocol):
+    """Protocol for derivative resolvers (Phase 4)."""
+
+    def get_tradable_instruments(
+        self, underlyings: List[Asset], filter_criteria: Optional[Any] = None
+    ) -> Dict[str, List[Any]]:
+        ...
+
+
 class ScreeningPipeline:
     """Main orchestrator for the screening workflow."""
 
     def __init__(
         self,
         provider: UniverseProviderProtocol,
-        filters: List[FilterStageProtocol],
+        filters: Union[List[FilterStageProtocol], "FilterRegistry", FilterRegistryProtocol],
         config: ScreeningConfig,
         audit_logger: AuditLoggerProtocol,
         metrics_collector: MetricsCollectorProtocol,
@@ -196,13 +219,14 @@ class ScreeningPipeline:
         health_monitor: Optional[HealthMonitorProtocol] = None,
         snapshot_manager: Optional[SnapshotManagerProtocol] = None,
         version_manager: Optional[VersionManagerProtocol] = None,
+        derivative_resolver: Optional[DerivativeResolverProtocol] = None,
     ) -> None:
         """
         Initialize pipeline with all dependencies.
 
         Args:
             provider: Data access provider
-            filters: Ordered list of filter stages
+            filters: Ordered list of filter stages OR FilterRegistry (Phase 4)
             config: Screening configuration
             audit_logger: For audit trail
             metrics_collector: For performance metrics
@@ -212,9 +236,9 @@ class ScreeningPipeline:
             health_monitor: For health checks (optional, Phase 2)
             snapshot_manager: For point-in-time consistency (optional, Phase 2)
             version_manager: For version tracking (optional, Phase 2)
+            derivative_resolver: For derivative instruments (optional, Phase 4)
         """
         self.provider = provider
-        self.filters = filters
         self.config = config
         self.audit_logger = audit_logger
         self.metrics_collector = metrics_collector
@@ -224,10 +248,33 @@ class ScreeningPipeline:
         self.health_monitor = health_monitor
         self.snapshot_manager = snapshot_manager
         self.version_manager = version_manager
+        self.derivative_resolver = derivative_resolver
+
+        # Phase 4: Support both List[FilterStage] and FilterRegistry
+        self._filter_registry: Optional[FilterRegistryProtocol] = None
+        if isinstance(filters, list):
+            # Backwards compatible: use list directly
+            self._filters: List[FilterStageProtocol] = filters
+        else:
+            # New: use registry (duck typing for Protocol)
+            self._filter_registry = filters
+            self._filters = []  # Will be populated dynamically
 
         # Register filter versions if version manager available
         if self.version_manager:
-            self.version_manager.register_filters(filters)
+            self.version_manager.register_filters(self.filters)
+
+    @property
+    def filters(self) -> List[FilterStageProtocol]:
+        """
+        Get active filters (from list or registry).
+        
+        Returns:
+            List of active filter stages
+        """
+        if self._filter_registry:
+            return self._filter_registry.get_enabled_filters()
+        return self._filters
 
     def screen(
         self,
@@ -312,7 +359,10 @@ class ScreeningPipeline:
         current_assets = context.assets
         audit_trail: List[StageResult] = []
 
-        for filter_stage in self.filters:
+        # Phase 4: Get filters from registry if available
+        active_filters = self.filters
+
+        for filter_stage in active_filters:
             stage_result, current_assets = self._execute_stage(
                 filter_stage, current_assets, date, context
             )
@@ -326,6 +376,20 @@ class ScreeningPipeline:
             {"asset_class": asset_class.value},
         )
 
+        # Phase 4: Resolve derivative instruments if resolver available
+        tradable_instruments: Optional[Dict[str, List[Any]]] = None
+        if self.derivative_resolver and current_assets:
+            try:
+                tradable_instruments = self.derivative_resolver.get_tradable_instruments(
+                    current_assets
+                )
+                self.metrics_collector.record_count(
+                    "tradable_instruments_total",
+                    sum(len(v) for v in tradable_instruments.values()),
+                )
+            except Exception as e:
+                logger.warning(f"Derivative resolution failed: {e}")
+
         # 7. Build result
         result = ScreeningResult(
             request=request,
@@ -334,6 +398,7 @@ class ScreeningPipeline:
             audit_trail=audit_trail,
             metrics=self.metrics_collector.get_metrics(),
             metadata=self._build_metadata(correlation_id, total_duration, snapshot_id),
+            tradable_instruments=tradable_instruments,
         )
 
         # Phase 2: Post-filtering health check
@@ -461,7 +526,7 @@ class ScreeningPipeline:
             "correlation_id": correlation_id,
             "timestamp": datetime.now().isoformat(),
             "duration_seconds": duration,
-            "version": "0.3.0",  # Phase 2 with observability
+            "version": "0.4.0",  # Phase 4 with extensibility
         }
 
         # Add snapshot ID if available

@@ -30,7 +30,7 @@ Example:
 
 import logging
 
-__version__ = "0.4.0"  # Phase 3 with scalability (caching, multi-asset-class)
+__version__ = "0.5.0"  # Phase 4 with extensibility (FilterRegistry, DerivativeResolver)
 
 
 def configure_logging(
